@@ -125,6 +125,102 @@ SELECT * FROM Camp_assignment ca JOIN (
 
 -- More on Grouping
 -- How many bird eggs are in each nest?
-SELECT Nest_ID, COUNT(Egg_num)
+SELECT Nest_ID, COUNT(*)
     FROM Bird_eggs
     GROUP BY Nest_ID;
+
+
+-- WEEK 4 Mon 4/22
+SELECT Species FROM Bird_nests WHERE Site = 'nome';
+SELECT Species, COUNT(*) AS Nest_count
+    FROM Bird_nests WHERE Site = 'nome'
+    GROUP BY Species
+    ORDER BY Species
+    LIMIT 2;
+-- nesting queries
+SELECT Scientific_name, Nest_count FROM
+    (SELECT Species, COUNT(*) AS Nest_count
+    FROM Bird_nests WHERE Site = 'nome'
+    GROUP BY Species
+    ORDER BY Species
+    LIMIT 2) JOIN Species ON Species = Code;
+-- outer joins
+CREATE TEMP TABLE a (cola INTEGER, common INTEGER);
+INSERT INTO a VALUES (1,1), (2,2), (3,3);
+SELECT * FROM a;
+CREATE TEMP TABLE b (common INTEGER, colb INTEGER);
+INSERT INTO b VALUES (2,2), (3,3), (4,4), (5,5);
+SELECT * FROM b;
+    --inner join
+    SELECT * FROM a  INNER JOIN b USING (common); -- only keeps what they have in common
+    -- left or right outer join
+    SELECT * FROM a LEFT JOIN b USING (common);
+-- change how NULL values are displayed
+.nullvalue -NULL-
+
+SELECT * FROM a RIGHT JOIN b USING (common);
+
+-- What species do *not* have any nest data?
+SELECT * FROM Species 
+    WHERE Code NOT IN (SELECT DISTINCT Species From Bird_nests);
+    -- answer using an outer join
+    SELECT Code, Scientific_name, Nest_ID, Species, Year 
+        FROM Species LEFT JOIN Bird_nests ON Code = Species
+        WHERE Nest_ID IS NULL; 
+
+-- A gotcha when doing grouping
+SELECT * FROM Bird_eggs LIMIT 3;
+SELECT * FROM Bird_nests JOIN Bird_eggs USING (Nest_ID)
+    WHERE Nest_ID = '14eabaage01';
+SELECT Nest_ID, COUNT(*)
+    FROM Bird_nests JOIN Bird_eggs USING (Nest_ID)
+    WHERE Nest_ID = '14eabaage01'
+    GROUP BY Nest_ID;
+-- but what about this?
+-- conceptually, adding length does not make sense bc there are 3 unique values
+SELECT Nest_ID, COUNT(*), Length
+    FROM Bird_nests JOIN Bird_eggs USING (Nest_ID)
+    WHERE Nest_ID = '14eabaage01'
+    GROUP BY Nest_ID;
+-- new query
+-- Species only exists in Bird_nests so it's the same in every row after the group by, but duckdb doesn't like this
+SELECT Nest_ID, Species, COUNT(*)
+    FROM Bird_nests JOIN Bird_eggs USING (Nest_ID)
+    WHERE Nest_ID = '14eabaage01'
+    GROUP BY Nest_ID;
+    -- add group by species
+    SELECT Nest_ID, Species, COUNT(*)
+        FROM Bird_nests JOIN Bird_eggs USING (Nest_ID)
+        WHERE Nest_ID = '14eabaage01'
+        GROUP BY Nest_ID, Species;
+    -- workaround #2 ANY_VALUE
+    SELECT Nest_ID, ANY_VALUE(Species), COUNT(*)
+        FROM Bird_nests JOIN Bird_eggs USING (Nest_ID)
+        WHERE Nest_ID = '14eabaage01'
+        GROUP BY Nest_ID;
+-- Views
+SELECT * FROM Camp_assignment;
+SELECT Year, Site, NAme, Start, "End"
+    FROM Camp_assignment JOIN Personnel
+    ON Observer = Abbreviation;
+CREATE VIEW v AS
+    SELECT Year, Site, NAme, Start, "End"
+    FROM Camp_assignment JOIN Personnel
+    ON Observer = Abbreviation;
+-- a view looks just like a table, but it's not real
+SELECT * FROM v;
+
+-- set operations: UNION INTERSECT EXCEPT
+-- iffy example
+SELECT Book_page, Nest_ID, Egg_num, Length, Width FROM Bird_eggs;
+-- if there was a problem on one book page:
+SELECT Book_page, Nest_ID, Egg_num, Length*25.4, Width*25.4 FROM Bird_eggs
+    WHERE Book_page = 'b14.6'
+    UNION -- like an rbind
+SELECT Book_page, Nest_ID, Egg_num, Length, Width FROM Bird_eggs
+    WHERE Book_page != 'b14.6';
+-- UNION vs UNION ALL
+-- just mashes tables together
+-- Third way to answer: Which species had no nest data?
+SELECT Code FROM Species
+    EXCEPT SELECT DISTINCT Species FROM Bird_nests; -- don't want any species in the bird nest table
