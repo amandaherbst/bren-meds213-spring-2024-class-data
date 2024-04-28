@@ -66,13 +66,26 @@ SELECT Scientific_name, Max_vol
     ORDER BY -Max_vol;
 
 -- in one statement...
-SELECT Scientific_name, Max_vol
-    FROM Bird_eggs be JOIN Bird_nests bn USING Nest_ID
-    JOIN Species s ON bn.Species = s.Code
+SELECT Scientific_name, Max_vol FROM
+    ((SELECT Nest_ID, AVG((3.14/6)*(Width^2)*Length) AS Avg_volume
+        FROM Bird_eggs 
+        GROUP BY Nest_ID) 
+    JOIN Bird_nests bn USING (Nest_ID)
+    SELECT Species, MAX(Avg_volume) AS Max_vol
+        GROUP BY Species
+    JOIN Species s ON bn.Species = s.Code)
+    ORDER BY -Max_vol;
+    
+    
+    
+    
+    
+    
     WHERE Max_vol = (
         SELECT Species, MAX(Avg_vol) 
         WHERE Avg_vol = (
             SELECT Nest_ID, AVG((3.14/6)*(Width^2)*Length) AS Avg_vol 
             FROM Bird_eggs
+            GROUP BY Nest_ID
         )
     );
