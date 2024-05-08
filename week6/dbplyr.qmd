@@ -1,0 +1,91 @@
+---
+title: "dbplyr"
+---
+
+```{r}
+library(tidyverse)
+library(DBI)
+library(dbplyr)
+library(duckdb)
+```
+
+## Connect to database
+
+```{r}
+conn <- DBI::dbConnect(duckdb::duckdb(), dbdir = here::here("week3/database.db"))
+```
+
+```{r}
+DBI::dbListTables(conn)
+```
+
+```{r}
+species <- tbl(conn, "Species")
+species
+```
+
+## SQL query
+
+```{r}
+df <- dbGetQuery(conn, "SELECT * FROM Species WHERE Code LIKE 'a%'")
+# select all from species where the code starts with "a"
+df
+```
+
+
+## `dbplyr`
+
+```{r}
+# translates dplyr code into SQL!
+species %>% 
+  filter(Relevance == "Study species") %>% 
+  select(Code, Scientific_name) %>% 
+  show_query()
+```
+
+We cannot write to the database from R using `dbplyr`, even if you mutate, it only changes the R object.
+
+Want our query to result in a dataframe:
+```{r}
+species %>% 
+  filter(Relevance == "Study species") %>% 
+  select(Code, Scientific_name) %>% 
+  collect()
+```
+**Try to delay when you have to use collect() to save computation and memory**
+
+Group species by relevance and count how many species are in each group
+```{r}
+species %>% 
+  group_by(Relevance) %>% 
+  summarize(num_species = n()) %>% 
+  arrange(-num_species)
+```
+
+### We can even mutate!
+
+We want to add an "X" in front of the Codes and update the code column
+```{r}
+new_species_code <- species %>% 
+  mutate(Code = paste0("X", Code)) %>% 
+  collect()
+```
+
+### We can also join!
+
+```{r}
+eggs_db <- tbl(conn, "Bird_eggs")
+nests_db <- tbl(conn, "Bird_nests")
+```
+
+```{r}
+nests_db %>% 
+  left_join(eggs_db, by = c("Nest_ID", "Year", "Site", "Book_page")) %>% 
+  show_query()
+```
+
+## Close the connection to the database
+```{r}
+DBI::dbDisconnect(conn, shutdown=TRUE)
+```
+
