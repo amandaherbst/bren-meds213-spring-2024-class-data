@@ -1,0 +1,57 @@
+---
+title: "Assignment 6: Who were the winners?"
+author: "Amanda Herbst"
+date: 5/13/24
+---
+
+At the conclusion of the ASDN project the PIs decided to hand out first, second, and third prizes to the observers who measured the most eggs. Who won? Please use R and dbplyr to answer this question.
+
+Load libraries
+```{r, message = FALSE}
+library(tidyverse)
+library(DBI)
+library(dbplyr)
+library(duckdb)
+```
+
+## Connect to database
+
+```{r}
+conn <- DBI::dbConnect(duckdb::duckdb(), dbdir = here::here("week3/database.db"))
+```
+
+## Load necessary tables
+```{r}
+egg_table <- tbl(conn, "Bird_eggs")
+nest_table <- tbl(conn, "Bird_nests")
+personnel_table <- tbl(conn, "Personnel")
+```
+
+## Find the winners
+```{r}
+winners <- egg_table %>% 
+  # join with nest table to get observer ids
+  left_join(nest_table, by = c("Nest_ID", "Year", "Site", "Book_page")) %>% 
+  # count how many eggs per observer
+  group_by(Observer) %>% 
+  summarize(total_eggs = n()) %>% 
+  # join with personnel table to get full names of observers
+  left_join(personnel_table, by = c("Observer"="Abbreviation")) %>% 
+  select(Name, total_eggs) %>% 
+  # order by numer of eggs
+  arrange(-total_eggs) %>% 
+  # top 3
+  head(3) %>% 
+  collect()
+
+winners
+```
+
+## `show_query()`
+
+dbplyr was able to complete the above R code with one query using many nested queries. I used `head(3)` to limit to the first 3 rows but the query used `LIMIT 3`.
+
+## Close the connection to the database
+```{r}
+DBI::dbDisconnect(conn, shutdown=TRUE)
+```
